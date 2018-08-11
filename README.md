@@ -40,7 +40,8 @@ Performs target velocities calculation based on pure-persuit algorithm to follow
 
 Performs loading reference trajectory points and generates linear and angular velocities for each point based on desired velocity.
 
-### Native Installation
+# Installation
+## Native Installation
 
 * Be sure that your workstation is running Ubuntu 16.04 Xenial Xerus or Ubuntu 14.04 Trusty Tahir. [Ubuntu downloads can be found here](https://www.ubuntu.com/download/desktop).
 * If using a Virtual Machine to install Ubuntu, use the following configuration as minimum:
@@ -57,23 +58,7 @@ Performs loading reference trajectory points and generates linear and angular ve
   * Use this option to install the SDK on a workstation that already has ROS installed: [One Line SDK Install (binary)](https://bitbucket.org/DataspeedInc/dbw_mkz_ros/src/81e63fcc335d7b64139d7482017d6a97b405e250/ROS_SETUP.md?fileviewer=file-view-default)
 * Download the [Udacity Simulator](https://github.com/udacity/CarND-Capstone/releases).
 
-### Docker Installation
-[Install Docker](https://docs.docker.com/engine/installation/)
-
-Build the docker container
-```bash
-docker build . -t capstone
-```
-
-Run the docker file
-```bash
-docker run -p 4567:4567 -v $PWD:/capstone -v /tmp/log:/root/.ros/ --rm -it capstone
-```
-
-### Port Forwarding
-To set up port forwarding, please refer to the [instructions from term 2](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/16cf4a78-4fc7-49e1-8621-3450ca938b77)
-
-### Usage
+## Usage
 
 1. Clone the project repository
 ```bash
