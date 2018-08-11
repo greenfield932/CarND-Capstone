@@ -19,8 +19,8 @@ This project require to implement ROS nodes (partially) to drive self driving ca
 
 # Waypoint updater
 
-Waypoint updater gets information about vehicle pose and performs feeding waypoint follower with 200 points a head using reference points from waypoint loader. It implements finite state machine for handling start/stop logic according to 
-nearest traffic light ahead state give from traffic light detector. It also contains code for updating waypoints linear velocity and calculating optimal deceleration and acceleration speeds.
+Waypoint updater gets information about vehicle pose and performs feeding waypoint follower with 200 points ahead using reference points from waypoint loader. It implements finite state machine for handling start/stop logic according to 
+a nearest traffic light state. It also contains code for updating waypoints linear velocity and calculating optimal deceleration and acceleration speeds.
 
 # Traffic light detector and classifier
 
