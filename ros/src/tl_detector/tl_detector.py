@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import rospy
 from std_msgs.msg import Int32
+from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped, Pose
 from styx_msgs.msg import TrafficLightArray, TrafficLight
 from styx_msgs.msg import Lane
@@ -14,7 +15,8 @@ from scipy.spatial import KDTree
 import numpy as np
 
 STATE_COUNT_THRESHOLD = 3
-
+DETECT_RATE_DELAY = 1 #each seconds detect
+SHOW_DETECTED_IMAGE = False
 class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector')
@@ -25,7 +27,8 @@ class TLDetector(object):
         self.lights = []
         self.waypoints_2d = None
         self.waypoint_tree = None
-
+        self.recording = False
+        
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
@@ -37,10 +40,16 @@ class TLDetector(object):
         rely on the position of the light and the camera image to predict it.
         '''
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
+        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, queue_size=1)
+        
+        sub9 = rospy.Subscriber('/record_imgs', Bool, self.record_cb)
+
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
+
+        if SHOW_DETECTED_IMAGE:
+            self.detection_result_pub = rospy.Publisher('/traffic_detection', Image, queue_size=1)
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
@@ -50,13 +59,19 @@ class TLDetector(object):
 
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
+        self.light_detected_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
-
+        self.img_cnt = 0
+        self.img_written_cnt = 0
+        self.detection_timestamp = rospy.get_time()
         rospy.spin()
 
     def pose_cb(self, msg):
         self.pose = msg
+
+    def record_cb(self, msg):
+        self.recording = msg.data
 
     def waypoints_cb(self, waypoints):
         if not self.waypoints_2d:
@@ -79,6 +94,16 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
+        #code for image collection from simulator, can be controlled outside by 
+        #for single image: rostopic pub /record_imgs std_msgs/Bool True 
+        #for multiple shots 3 times per sec: rostopic -f 3 pub /record_imgs std_msgs/Bool True
+        
+        if self.recording == True:
+            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            cv2.imwrite("./images/"+str(self.img_written_cnt)+".png", cv_image)
+            self.img_written_cnt+=1
+            self.recording = False
+        
         if self.waypoint_tree is None:
             return
         
@@ -143,17 +168,24 @@ class TLDetector(object):
         Returns:
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
+        
         """
         #if(not self.has_image):
         #    self.prev_light_loc = None
         #    return False
 
-        #cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-
+        if self.detection_timestamp and rospy.get_time() - self.detection_timestamp >=DETECT_RATE_DELAY and self.camera_image:
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+            self.light_detected_state, out_image = self.light_classifier.get_classification(cv_image)
+            if SHOW_DETECTED_IMAGE:
+                cv_image = self.bridge.cv2_to_imgmsg(out_image, "bgr8")
+                self.detection_result_pub.publish(cv_image)
+            self.detection_timestamp = rospy.get_time()
+            
         #Get classification
         #return self.light_classifier.get_classification(cv_image)
         
-        return light.state
+        return self.light_detected_state
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
