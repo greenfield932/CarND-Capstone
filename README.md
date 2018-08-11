@@ -17,26 +17,26 @@ This project require to implement ROS nodes (partially) to drive self driving ca
 
 ![alt text][image2]
 
-# Waypoint updater
+## Waypoint updater
 
 Waypoint updater gets information about vehicle pose and performs feeding waypoint follower with 200 points ahead using reference points from waypoint loader. It implements finite state machine for handling start/stop logic according to 
 a nearest traffic light state. It also contains code for updating waypoints linear velocity and calculating optimal deceleration and acceleration speeds.
 
-# Traffic light detector and classifier
+## Traffic light detector and classifier
 
 Traffic light detector and classifier is implemented as a deep neural network for object detection. It performs object detection and classification at the same time.
 Neural net was implemented using [Tensorflow Object Detection API](https://github.com/tensorflow/models/tree/master/research/object_detection). [Here](https://github.com/EdjeElectronics/TensorFlow-Object-Detection-API-Tutorial-Train-Multiple-Objects-Windows-10) is a pretty good tutorial of how to do that.
 Original network used for training is [faster_rcnn_inception_v2_coco](http://download.tensorflow.org/models/object_detection/faster_rcnn_inception_v2_coco_2018_01_28.tar.gz). Training images were extracted from simulator and manually annotated using [labelImg software](https://github.com/tzutalin/labelImg)
 
-# DBW (drive-by-wire) node
+## DBW (drive-by-wire) node
 
 This node gets twist data as input and generates brake/throttle/steering messages using PID controllers.
 
-# Waypoint follower
+## Waypoint follower
 
 Performs target velocities calculation based on pure-persuit algorithm to follow the trajectory.
 
-# Waypoint loader
+## Waypoint loader
 
 Performs loading reference trajectory points and generates linear and angular velocities for each point based on desired velocity.
 
