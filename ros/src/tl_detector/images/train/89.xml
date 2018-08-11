@@ -1,0 +1,26 @@
+<annotation>
+	<folder>train</folder>
+	<filename>89.png</filename>
+	<path>/home/greenfield/udacity/capstone/tensorflow1/models/research/object_detection/images/train/89.png</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>800</width>
+		<height>600</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>green</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>379</xmin>
+			<ymin>2</ymin>
+			<xmax>479</xmax>
+			<ymax>217</ymax>
+		</bndbox>
+	</object>
+</annotation>
