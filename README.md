@@ -78,3 +78,9 @@ source devel/setup.sh
 roslaunch launch/styx.launch
 ```
 4. Run the simulator
+
+
+# Contributors
+| Name | E-mail | 
+| ------ | ------ | 
+| Dmitry Tyugin | dtyugin@gmail.com |
