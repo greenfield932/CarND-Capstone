@@ -15,7 +15,7 @@ from scipy.spatial import KDTree
 import numpy as np
 
 STATE_COUNT_THRESHOLD = 3
-DETECT_RATE_DELAY = 1 #each seconds detect
+DETECT_RATE_DELAY = 0.3 #each seconds detect
 SHOW_DETECTED_IMAGE = False
 class TLDetector(object):
     def __init__(self):

@@ -25,6 +25,7 @@ NUM_CLASSES = 3
 MIN_SCORE = 0.98
 
 labels = ['red', 'yellow', 'green']
+colors_bgr = [(0,0,255), (0,255,255),(0,255,0)]
 label_idx_map = [1, 2, 3]
 light_value = [TrafficLight.RED, TrafficLight.YELLOW, TrafficLight.GREEN]
 
@@ -107,8 +108,8 @@ class TLClassifier(object):
                 box[3] = int(box[3]*image.shape[1])
 
                 #Add rect and score on the input image
-                cv2.rectangle(image,(box[1],box[0]),(box[3], box[2]),(0,255,0),3)
-                cv2.putText(image, label + " " + str(score)+"'%'",(box[1],int(box[0]-20)), cv2.FONT_HERSHEY_SIMPLEX , 0.5,(0,0,255),1,cv2.LINE_AA)
+                cv2.rectangle(image,(box[1],box[0]),(box[3], box[2]),colors_bgr[label_idx],3)
+                cv2.putText(image, label + " " + str(score)+"'%'",(box[1],int(box[0]-20)), cv2.FONT_HERSHEY_SIMPLEX , 0.5,colors_bgr[label_idx],1,cv2.LINE_AA)
                 return light_value[label_idx], image
             else:
                 rospy.loginfo("no light found")
