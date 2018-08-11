@@ -5,17 +5,17 @@ This is the project repo for the final project of the Udacity Self-Driving Car N
 [image1]: ./imgs/output_video.gif
 [image2]: ./imgs/overview.png
 
+# Result video
+
+The following video contains testing of the project using simulator
+
+![alt text][image1]
+
 # Project overview
 
 This project require to implement ROS nodes (partially) to drive self driving car. It includes implementation of waypoint updater, twist controller, traffic light detector and classifier. The project consists of the following architecture:
 
 ![alt text][image2]
-
-# Result video
-
-The following video contains testing of the system using simulator
-
-![alt text][image1]
 
 # Waypoint updater
 
