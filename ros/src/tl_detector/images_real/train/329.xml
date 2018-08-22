@@ -1,0 +1,26 @@
+<annotation>
+	<folder>train</folder>
+	<filename>329.png</filename>
+	<path>/home/greenfield/udacity/capstone/CarND-Capstone/ros/src/tl_detector/images_real/train/329.png</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>1368</width>
+		<height>1096</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>green</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>575</xmin>
+			<ymin>368</ymin>
+			<xmax>628</xmax>
+			<ymax>495</ymax>
+		</bndbox>
+	</object>
+</annotation>
