@@ -6,23 +6,14 @@ import tensorflow as tf
 import sys
 import rospy
 
-#code from tensorflow object detection API sample
-
 # Name of the directory containing the object detection module we're using
 MODEL_NAME = 'inference_graph'
-
-# Grab path to current working directory
-CWD_PATH = os.getcwd()
-
-# Path to frozen detection graph .pb file, which contains the model that is used
-# for object detection.
-PATH_TO_CKPT = os.path.join(CWD_PATH,MODEL_NAME,'frozen_inference_graph.pb')
 
 # Number of classes the object detector can identify
 NUM_CLASSES = 3
 
 #Minimum probability for object detection correctness
-MIN_SCORE = 0.98
+MIN_SCORE = 0.90
 
 labels = ['red', 'yellow', 'green']
 colors_bgr = [(0,0,255), (0,255,255),(0,255,0)]
@@ -30,9 +21,21 @@ label_idx_map = [1, 2, 3]
 light_value = [TrafficLight.RED, TrafficLight.YELLOW, TrafficLight.GREEN]
 
 class TLClassifier(object):
-    def __init__(self):
-        #TODO load classifier
-        rospy.loginfo("Load graph from: " + CWD_PATH)
+    def __init__(self, is_site):
+        #load classifier
+
+        # Grab path to current working directory
+        CWD_PATH = os.getcwd()
+
+        # Path to frozen detection graph .pb file, which contains the model that is used
+        # for object detection.
+        PATH_TO_CKPT = os.path.join(CWD_PATH,MODEL_NAME,'frozen_inference_graph_sym.pb')
+
+        if is_site == True:
+            PATH_TO_CKPT = os.path.join(CWD_PATH,MODEL_NAME,'frozen_inference_graph_real.pb')
+
+
+        rospy.loginfo("Load graph from: " + PATH_TO_CKPT)
         
          # Load the Tensorflow model into memory.
         detection_graph = tf.Graph()
@@ -75,8 +78,8 @@ class TLClassifier(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
-        if image is None or image.shape[0]!=600 or image.shape[1]!=800:
-            return TrafficLight.UNKNOWN, None
+        #if image is None or image.shape[0]!=600 or image.shape[1]!=800:
+        #    return TrafficLight.UNKNOWN, None
 
         # Load image using OpenCV and
         # expand image dimensions to have shape: [1, None, None, 3]
