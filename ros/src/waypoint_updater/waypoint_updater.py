@@ -30,6 +30,7 @@ MAX_ACCEL = 10 #m/s^2
 DRIVE_STATE_BREAK = "STATE_BREAK"
 DRIVE_STATE_BREAKING = "STATE_BREAKING"
 DRIVE_STATE_ACCEL = "STATE_ACCEL"
+DRIVE_STATE_ACCELERATING = "STATE_ACCELERATING"
 DRIVE_STATE_DRIVING = "STATE_DRIVING"
 
 
@@ -51,6 +52,8 @@ class WaypointUpdater(object):
         self.base_waypoints = None
         self.waypoints_2d = None
         self.waypoint_tree = None
+        self.accel_end_wp_idx = -1
+        
         # TODO: Add other member variables you need below
 
         self.drive_state = DRIVE_STATE_BREAKING
@@ -68,6 +71,16 @@ class WaypointUpdater(object):
                 closest_waypoint_idx = self.get_closest_waypoint_idx()
                 self.publish_waypoints(closest_waypoint_idx)
             rate.sleep()
+
+    #def out_of_change_speed(self):
+    #    current_wp_idx = self.get_closest_waypoint_idx()
+    #    if self.accel_start_wp_idx==-1 or self.accel_end_wp_idx == -1:
+    #        return True
+    #    return !(self.accel_start_wp_idx <= current_wp_idx and current_wp_idx <= self.accel_end_wp_idx)
+
+    def out_of_accelerating(self):
+        current_wp_idx = self.get_closest_waypoint_idx()
+        return  self.accel_end_wp_idx < current_wp_idx
 
     def get_closest_waypoint_idx(self):
         x = self.pose.pose.position.x
@@ -93,15 +106,33 @@ class WaypointUpdater(object):
         lane = Lane()
         lane.header = self.base_waypoints.header
         lane.waypoints = self.base_waypoints.waypoints[closest_idx:closest_idx + LOOKAHEAD_WPS]
+        #rospy.loginfo("Closest idx: "+str(closest_idx))
         if len(lane.waypoints) < 10 and closest_idx > 10:
             for i in range(0, 10):
                 lane.waypoints.append(self.base_waypoints.waypoints[i])
 
+        #Check if we overlap with acceleration trajectory like we are on second lap
+        #in this case we may stop because of previously set zero speed points
+        #if 
+        #for i in range(0, len(lane.waypoints)):
+        #    if self.drive_state == DRIVE_STATE_DRIVING:
+        #        self.set_waypoint_velocity(lane.waypoints, i, self.max_vel)
+
+        #rospy.loginfo("Final waypoints count: "+str(len(lane.waypoints)))
+        
         self.final_waypoints_pub.publish(lane)
 
     def pose_cb(self, msg):
         # TODO: Implement
+        
         self.pose = msg
+        current_wp_idx = self.get_closest_waypoint_idx()
+        if current_wp_idx == 0:
+            wp_count = len(self.base_waypoints.waypoints)
+            self.set_waypoint_velocity(self.base_waypoints.waypoints, wp_count-1, self.max_vel)
+        else:
+            self.set_waypoint_velocity(self.base_waypoints.waypoints, current_wp_idx-1, self.max_vel)
+        self.process_state_machine()
         pass
 
     def waypoints_cb(self, waypoints):
@@ -128,7 +159,7 @@ class WaypointUpdater(object):
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
         light_wp_idx = msg.data
-        
+        #rospy.loginfo("Traffic cb")
         if self.base_waypoints is not None and self.pose is not None:
             if light_wp_idx is not None and light_wp_idx!=-1:
                 current_wp_idx = self.get_closest_waypoint_idx()
@@ -154,7 +185,7 @@ class WaypointUpdater(object):
         current_wp_idx = self.get_closest_waypoint_idx()
         current_vel = self.get_waypoint_velocity_by_idx(current_wp_idx)
         dist = self.distance(self.base_waypoints.waypoints, current_wp_idx, target_idx)
-        rospy.loginfo("dist to target: "+str(dist))
+        #rospy.loginfo("dist to target: "+str(dist))
         if dist < 5 and current_vel < 0.1:
             return True
 
@@ -164,9 +195,9 @@ class WaypointUpdater(object):
 
         accel = current_vel/dt
         accel_diff = MAX_ACCEL - accel
-        rospy.loginfo("accel to target: "+str(accel))
+        #rospy.loginfo("accel to target: "+str(accel))
         if accel >= MAX_ACCEL/2.:
-            rospy.loginfo("Brake is optimal, start braking")
+        #    rospy.loginfo("Brake is optimal, start braking")
             return True
 
         return False
@@ -176,7 +207,7 @@ class WaypointUpdater(object):
         rospy.loginfo("accelerate")
         current_wp_idx = self.get_closest_waypoint_idx()
         current_vel = self.get_waypoint_velocity(self.base_waypoints.waypoints[current_wp_idx])
-
+        self.accel_start_wp_idx = current_wp_idx
         next_vel = current_vel
         if next_vel < 1:
             next_vel = 1
@@ -191,6 +222,9 @@ class WaypointUpdater(object):
             #rospy.loginfo("set vel to idx:"+str(idx) + " vel:" + str(next_vel))
 
             self.set_waypoint_velocity(self.base_waypoints.waypoints, idx, next_vel)
+        for idx in range(0, current_wp_idx-1):
+            self.set_waypoint_velocity(self.base_waypoints.waypoints, idx, self.max_vel)
+
         #TODO don't care about second lap for now
         #for idx in range(0, current_wp_idx - 1):
         #    dist = distance(self.base_waypoints.waypoints, idx -1, idx)
@@ -221,8 +255,8 @@ class WaypointUpdater(object):
                     target_vel = 0
                 self.set_waypoint_velocity(self.base_waypoints.waypoints, idx, target_vel)
 
-            for idx in range(current_wp_idx, target_wp_idx+1):
-                rospy.loginfo("set vel to idx:"+str(idx) + " vel:" + str(self.get_waypoint_velocity(self.base_waypoints.waypoints[idx])))
+#            for idx in range(current_wp_idx, target_wp_idx+1):
+#                rospy.loginfo("set vel to idx:"+str(idx) + " vel:" + str(self.get_waypoint_velocity(self.base_waypoints.waypoints[idx])))
 
 
     #state machine for start/stop logic
@@ -230,12 +264,21 @@ class WaypointUpdater(object):
         prev_state = self.drive_state
         if self.drive_state == DRIVE_STATE_ACCEL:
             self.accelerate()
+            #self.drive_state = DRIVE_STATE_ACCELERATING
             self.drive_state = DRIVE_STATE_DRIVING
+
+
+        #elif self.drive_state == DRIVE_STATE_ACCELERATING and self.out_of_accelerating():
+        #    self.drive_state = DRIVE_STATE_DRIVING
+        #    self.accel_end_wp_idx = -1
         elif self.drive_state == DRIVE_STATE_BREAK:
             self.decelerate(self.closest_light_wp)
             self.drive_state = DRIVE_STATE_BREAKING
+
         elif self.drive_state == DRIVE_STATE_BREAKING and self.red_light == False:
             self.drive_state = DRIVE_STATE_ACCEL
+
+        #elif (self.drive_state == DRIVE_STATE_DRIVING or self.drive_state == DRIVE_STATE_ACCELERATING) and self.red_light == True:
         elif self.drive_state == DRIVE_STATE_DRIVING and self.red_light == True:
             self.drive_state = DRIVE_STATE_BREAK
 
