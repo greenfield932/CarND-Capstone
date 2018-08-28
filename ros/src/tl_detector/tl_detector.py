@@ -15,8 +15,7 @@ from scipy.spatial import KDTree
 import numpy as np
 
 STATE_COUNT_THRESHOLD = 3
-DETECT_RATE_DELAY = 0.3 #each seconds detect
-
+DETECT_RATE_DELAY = 0.5 #each seconds detect
 class TLDetector(object):
     def __init__(self):
         rospy.init_node('tl_detector')
@@ -28,7 +27,8 @@ class TLDetector(object):
         self.waypoints_2d = None
         self.waypoint_tree = None
         self.recording = False
-        self.show_detection = False
+        self.show_detection = True
+        self.debug_detection = False
         self.detection_timestamp = rospy.get_time()
         
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
@@ -113,7 +113,8 @@ class TLDetector(object):
             self.recording = False
 
         #rosbag debug
-        #state = self.get_light_state(None)
+        if self.debug_detection == True:
+            state = self.get_light_state(None)
 
         self.has_image = True
         self.camera_image = msg
