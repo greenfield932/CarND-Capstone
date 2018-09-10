@@ -1,0 +1,26 @@
+<annotation>
+	<folder>images_new</folder>
+	<filename>2259.png</filename>
+	<path>/home/greenfield/udacity/capstone/CarND-Capstone/ros/src/tl_detector/images_new/2259.png</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>800</width>
+		<height>600</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>red</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>160</xmin>
+			<ymin>204</ymin>
+			<xmax>190</xmax>
+			<ymax>297</ymax>
+		</bndbox>
+	</object>
+</annotation>

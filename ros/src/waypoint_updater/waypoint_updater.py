@@ -24,7 +24,8 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-MAX_ACCEL = 10 #m/s^2
+MAX_ACCEL = 2 #m/s^2
+STOP_DIST_TRESHOLD = 3 #meters
 
 #State machine states for performing start/stop/accel/deccel logic depending on traffic light
 DRIVE_STATE_BREAK = "STATE_BREAK"
@@ -65,18 +66,10 @@ class WaypointUpdater(object):
     def loop(self):
         rate = rospy.Rate(50)
         while not rospy.is_shutdown():
-            #rospy.loginfo("loop")
             if self.pose and self.base_waypoints:
-                #rospy.loginfo("find waypoint")
                 closest_waypoint_idx = self.get_closest_waypoint_idx()
                 self.publish_waypoints(closest_waypoint_idx)
             rate.sleep()
-
-    #def out_of_change_speed(self):
-    #    current_wp_idx = self.get_closest_waypoint_idx()
-    #    if self.accel_start_wp_idx==-1 or self.accel_end_wp_idx == -1:
-    #        return True
-    #    return !(self.accel_start_wp_idx <= current_wp_idx and current_wp_idx <= self.accel_end_wp_idx)
 
     def out_of_accelerating(self):
         current_wp_idx = self.get_closest_waypoint_idx()
@@ -98,7 +91,6 @@ class WaypointUpdater(object):
         val = np.dot(cl_vect - prev_vect, pos_vect - cl_vect)
         if val > 0:
             closest_idx = (closest_idx + 1) % len(self.waypoints_2d)
-        #rospy.loginfo("found waypoint:"+str(closest_idx))
 
         return closest_idx
 
@@ -106,38 +98,18 @@ class WaypointUpdater(object):
         lane = Lane()
         lane.header = self.base_waypoints.header
         lane.waypoints = self.base_waypoints.waypoints[closest_idx:closest_idx + LOOKAHEAD_WPS]
-        #rospy.loginfo("Closest idx: "+str(closest_idx))
         if len(lane.waypoints) < 10 and closest_idx > 10:
             for i in range(0, 10):
                 lane.waypoints.append(self.base_waypoints.waypoints[i])
 
-        #Check if we overlap with acceleration trajectory like we are on second lap
-        #in this case we may stop because of previously set zero speed points
-        #if 
-        #for i in range(0, len(lane.waypoints)):
-        #    if self.drive_state == DRIVE_STATE_DRIVING:
-        #        self.set_waypoint_velocity(lane.waypoints, i, self.max_vel)
-
-        #rospy.loginfo("Final waypoints count: "+str(len(lane.waypoints)))
-        
         self.final_waypoints_pub.publish(lane)
 
     def pose_cb(self, msg):
-        # TODO: Implement
-        
         self.pose = msg
-        current_wp_idx = self.get_closest_waypoint_idx()
-        if current_wp_idx == 0:
-            wp_count = len(self.base_waypoints.waypoints)
-            self.set_waypoint_velocity(self.base_waypoints.waypoints, wp_count-1, self.max_vel)
-        else:
-            self.set_waypoint_velocity(self.base_waypoints.waypoints, current_wp_idx-1, self.max_vel)
         self.process_state_machine()
         pass
 
     def waypoints_cb(self, waypoints):
-        # TODO: Implement
-
         if not self.waypoints_2d:
             self.waypoints_2d = []
             for waypoint in waypoints.waypoints:
@@ -149,62 +121,72 @@ class WaypointUpdater(object):
         for wp in waypoints.waypoints:
             self.max_vel = max(self.max_vel, wp.twist.twist.linear.x)
 
+        for idx in range(0, len(self.base_waypoints.waypoints)):
+            self.set_waypoint_velocity(self.base_waypoints.waypoints, idx, 0)
+            
         #find out max velocity from loaded waypoints
-        rospy.loginfo("max vel:" + str(self.max_vel))
+        rospy.loginfo("WU: max vel:" + str(self.max_vel))
 
-        #for i in range(0, len(waypoints.waypoints)):
-        #    rospy.loginfo("Velocity for: " + str(i) + " is " +str(self.get_waypoint_velocity(self.base_waypoints.waypoints[i])))
-        pass
-
+    #check if we need to start decelerating depending on light and distance to light point
     def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
         light_wp_idx = msg.data
-        #rospy.loginfo("Traffic cb")
-        if self.base_waypoints is not None and self.pose is not None:
+        if self.base_waypoints is not None and self.pose is not None: # and light_wp_idx is not None and light_wp_idx!=-1:
             if light_wp_idx is not None and light_wp_idx!=-1:
                 current_wp_idx = self.get_closest_waypoint_idx()
                 if current_wp_idx is not None and current_wp_idx !=-1:
                     dist = self.distance(self.base_waypoints.waypoints, current_wp_idx, light_wp_idx)
-                    if self.is_break_optimal(light_wp_idx) or dist < 20:
-                        #rospy.loginfo("target light distance: "+str(dist))
-                        #if dist <= self.get_optimal_break_distance():
-                        #    rospy.loginfo("update traffic light to RED")
+                    safe_dist = self.get_min_safe_break_distance(light_wp_idx)
+                    if dist - STOP_DIST_TRESHOLD <= safe_dist:
                         self.red_light = True
                         self.closest_light_wp = light_wp_idx
+                        rospy.loginfo("WU: Waiting for GREEN light to run:" + str(dist)+ " of safe " +str(safe_dist))
                     else:
                         self.red_light = False
-                        rospy.loginfo("red light but too far to stop")
+                        rospy.loginfo("WU: Red light found but too far to stop: " + str(dist)+ " of safe " +str(safe_dist))
             else:
                 self.red_light = False
-                rospy.loginfo("update traffic light to GREEN")
+                rospy.loginfo("WU: No light WP found, update traffic light to GREEN")
 
-            self.process_state_machine()
-
-    #check if we should start braking depending on desired deceleration and distance to target stop point
-    def is_break_optimal(self, target_idx):
+    #estimate distance for deceleration to target point with MAX_ACCEL aceleration
+    def get_min_safe_break_distance(self, target_idx):
         current_wp_idx = self.get_closest_waypoint_idx()
         current_vel = self.get_waypoint_velocity_by_idx(current_wp_idx)
-        dist = self.distance(self.base_waypoints.waypoints, current_wp_idx, target_idx)
-        #rospy.loginfo("dist to target: "+str(dist))
-        if dist < 5 and current_vel < 0.1:
-            return True
+        rospy.loginfo("WU: current vel:"+str(current_vel))
+        #a = du/dt
+        #a = MAX_ACCEL
+        
+        curr_idx = current_wp_idx
+        next_idx = current_wp_idx
+        start_idx = current_wp_idx
+        
+        waypoints_count = len(self.base_waypoints.waypoints)
+        total_dist = 0
+        while current_vel > 0:
+            next_idx = curr_idx+1
+            if next_idx > waypoints_count-1:
+                next_idx = 0
 
-        dt = dist/current_vel
-        if dt < 0.01:
-            return True
+            if next_idx == start_idx:
+                #second lap, we can't safely break on such small track or such large speed or such small accel
+                return 0
 
-        accel = current_vel/dt
-        accel_diff = MAX_ACCEL - accel
-        #rospy.loginfo("accel to target: "+str(accel))
-        if accel >= MAX_ACCEL/2.:
-        #    rospy.loginfo("Brake is optimal, start braking")
-            return True
+            L = self.distance(self.base_waypoints.waypoints, curr_idx, next_idx)
+            total_dist += L
+            t = L/current_vel #time for move from p0 to p1 with current constant speed
+            #assume we can immidiately change speed by the step equal to MAX_ACCEL between waypoints
+            #find speed in next point
+            #a = dV/dt
+            #a = (V2-V1)/t
+            #V2 = at + V1
+            #add minus for deceleration V2 = -at + V1
+            current_vel = -MAX_ACCEL*t + current_vel
+            curr_idx = next_idx
 
-        return False
+        return total_dist
 
     #update waypoints for acceleration from current position to target velocity
     def accelerate(self):
-        rospy.loginfo("accelerate")
+        rospy.loginfo("WU: accelerate")
         current_wp_idx = self.get_closest_waypoint_idx()
         current_vel = self.get_waypoint_velocity(self.base_waypoints.waypoints[current_wp_idx])
         self.accel_start_wp_idx = current_wp_idx
@@ -225,52 +207,48 @@ class WaypointUpdater(object):
         for idx in range(0, current_wp_idx-1):
             self.set_waypoint_velocity(self.base_waypoints.waypoints, idx, self.max_vel)
 
-        #TODO don't care about second lap for now
-        #for idx in range(0, current_wp_idx - 1):
-        #    dist = distance(self.base_waypoints.waypoints, idx -1, idx)
-        #    next_vel = prev_vel + max_accel * dist / prev_vel
-        #    self.set_waypoint_velocity(self.base_waypoints.waypoints, idx, next_vel)
-
     #update waypoints for deceleration from current position to target waypoint
     def decelerate(self, target_wp_idx):
-        rospy.loginfo("decelerate")
+        rospy.loginfo("WU: decelerate")
         current_wp_idx = self.get_closest_waypoint_idx()
-        waypoints_count = abs(target_wp_idx - current_wp_idx)
-        if waypoints_count <=2:
-            self.set_waypoint_velocity(self.base_waypoints.waypoints, current_wp_idx, 0.)
-        else:
-            current_vel = self.get_waypoint_velocity(self.base_waypoints.waypoints[current_wp_idx])
-            target_vel = current_vel
-            deccel_step = current_vel/waypoints_count
-            #rospy.loginfo("deccel step: "+str(deccel_step))
-            #rospy.loginfo("current_vel: "+str(current_vel))
-            #rospy.loginfo("waypoints_count: "+str(waypoints_count))
-            
-            for idx in range(current_wp_idx, target_wp_idx+1):
-                i = idx - current_wp_idx
-                target_vel = current_vel - deccel_step * i
-                #if target_vel < 3:
-                #    target_vel = 3
-                if idx >= target_wp_idx - 4:
-                    target_vel = 0
-                self.set_waypoint_velocity(self.base_waypoints.waypoints, idx, target_vel)
+        current_vel = self.get_waypoint_velocity_by_idx(current_wp_idx)
 
-#            for idx in range(current_wp_idx, target_wp_idx+1):
-#                rospy.loginfo("set vel to idx:"+str(idx) + " vel:" + str(self.get_waypoint_velocity(self.base_waypoints.waypoints[idx])))
+        curr_idx = current_wp_idx
+        next_idx = current_wp_idx
+        start_idx = current_wp_idx
+        
+        waypoints_count = len(self.base_waypoints.waypoints)
+        total_dist = 0
+        while current_vel > 0:
+            next_idx = curr_idx+1
+            if next_idx > waypoints_count-1:
+                next_idx = 0
 
+            if next_idx == start_idx:
+                #second lap, we can't safely break on such small track or such large speed or such small accel
+                return
+
+            L = self.distance(self.base_waypoints.waypoints, curr_idx, next_idx)
+            total_dist += L
+            t = L/current_vel #time for move from p0 to p1 with current constant speed
+            #assume we can immidiately change speed by the step equal to MAX_ACCEL between waypoints
+            #find speed in next point
+            #a = dV/dt
+            #a = (V2-V1)/t
+            #V2 = at + V1
+            #add minus for deceleration V2 = -at + V1
+            current_vel = -MAX_ACCEL*t + current_vel
+            if current_vel < 0:
+                current_vel = 0
+            self.set_waypoint_velocity(self.base_waypoints.waypoints, next_idx, current_vel)
+            curr_idx = next_idx
 
     #state machine for start/stop logic
     def process_state_machine(self):
         prev_state = self.drive_state
         if self.drive_state == DRIVE_STATE_ACCEL:
             self.accelerate()
-            #self.drive_state = DRIVE_STATE_ACCELERATING
             self.drive_state = DRIVE_STATE_DRIVING
-
-
-        #elif self.drive_state == DRIVE_STATE_ACCELERATING and self.out_of_accelerating():
-        #    self.drive_state = DRIVE_STATE_DRIVING
-        #    self.accel_end_wp_idx = -1
         elif self.drive_state == DRIVE_STATE_BREAK:
             self.decelerate(self.closest_light_wp)
             self.drive_state = DRIVE_STATE_BREAKING
@@ -278,12 +256,11 @@ class WaypointUpdater(object):
         elif self.drive_state == DRIVE_STATE_BREAKING and self.red_light == False:
             self.drive_state = DRIVE_STATE_ACCEL
 
-        #elif (self.drive_state == DRIVE_STATE_DRIVING or self.drive_state == DRIVE_STATE_ACCELERATING) and self.red_light == True:
         elif self.drive_state == DRIVE_STATE_DRIVING and self.red_light == True:
             self.drive_state = DRIVE_STATE_BREAK
 
         if prev_state!=self.drive_state:
-            rospy.loginfo("state machine in: "+prev_state + " out: " + self.drive_state)
+            rospy.loginfo("WU: state machine in: "+prev_state + " out: " + self.drive_state)
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
