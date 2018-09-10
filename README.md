@@ -30,6 +30,7 @@ Original network used for training is [faster_rcnn_inception_v2_coco](http://dow
 For real traffic light detection and classification [YOLO implementation](https://github.com/experiencor/keras-yolo3) was used.
 Training images were extracted from simulator and ROSBAGs and manually annotated using [labelImg software](https://github.com/tzutalin/labelImg).
 Images and annotations can be found [here](https://github.com/greenfield932/CarND-Capstone/tree/master/ros/src/tl_detector/images) and here[here](https://github.com/greenfield932/CarND-Capstone/tree/master/ros/src/tl_detector/images_real)
+Weights cannot be uploaded to github due to file size and can be found [here](https://1drv.ms/u/s!AhLaNlESKiESgco-7BacJlmqM5BK1w)
 ## DBW (drive-by-wire) node
 
 This node gets twist data as input and generates brake/throttle/steering messages using PID controllers.
